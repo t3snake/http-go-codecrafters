@@ -37,7 +37,7 @@ func main() {
 	target := request_line_parts[1]
 	// http_version := request_line_parts[2]
 
-	if fmt.Sprintf("%x", target) == "/" {
+	if string(target) == "/" {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	} else {
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
