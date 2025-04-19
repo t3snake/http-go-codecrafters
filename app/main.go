@@ -21,14 +21,20 @@ func main() {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
+	defer l.Close()
 
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+
+		go HandleConnection(conn)
 	}
-	defer conn.Close()
+}
 
+func HandleConnection(conn net.Conn) {
 	request_buffer := make([]byte, 30000)
 	request_length, err := conn.Read(request_buffer)
 	if err != nil {
@@ -61,7 +67,6 @@ func main() {
 
 		}
 	}
-
 }
 
 // ParseRequest takes the request string and returns request line as string, request body as string and map of request headers respectively
