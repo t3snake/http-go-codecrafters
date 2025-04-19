@@ -5,7 +5,13 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
+
+const content_type_formatter = "Content-Type: %s\r\n"
+const content_type_plaintext = "text/plain"
+
+const content_length_formatter = "Content-Length: %d\r\n"
 
 func main() {
 	fmt.Println("Logs from your program will appear here!")
@@ -23,22 +29,32 @@ func main() {
 	}
 	defer conn.Close()
 
-	response_buffer := make([]byte, 30000)
-	content_length, err := conn.Read(response_buffer)
+	request_buffer := make([]byte, 30000)
+	content_length, err := conn.Read(request_buffer)
 	if err != nil {
-		fmt.Println("Error reading response: ", err.Error())
+		fmt.Println("Error reading request: ", err.Error())
 	}
 
-	response_parts := bytes.Split(response_buffer[:content_length], []byte("\r\n"))
-	request_line := response_parts[0]
+	request_parts := bytes.Split(request_buffer[:content_length], []byte("\r\n"))
+	request_line := request_parts[0]
 
 	request_line_parts := bytes.Split(request_line, []byte(" "))
 	// http_method := request_line_parts[0]
-	target := request_line_parts[1]
+	target := string(request_line_parts[1])
 	// http_version := request_line_parts[2]
 
-	if string(target) == "/" {
+	if target == "/" {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	} else if strings.HasPrefix(target, "/echo/") {
+		response_content := strings.ReplaceAll(target, "/echo/", "")
+
+		content_type := fmt.Sprintf(content_type_formatter, content_type_plaintext)
+		content_length := fmt.Sprintf(content_length_formatter, len(response_content))
+
+		response_headers := fmt.Sprintf("%s%s", content_type, content_length)
+
+		response := fmt.Sprintf("HTTP/1.1 200 OK\r\n%s\r\n%s", response_headers, response_content)
+		conn.Write([]byte(response))
 	} else {
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
