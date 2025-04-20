@@ -18,8 +18,13 @@ const content_length_formatter = "Content-Length: %d\r\n"
 const http_200 = "HTTP/1.1 200 OK"
 const http_404 = "HTTP/1.1 404 Not Found"
 
+var directory_flag *string
+
 func main() {
 	fmt.Println("Logs from your program will appear here!")
+
+	directory_flag = flag.String("directory", "", "")
+	flag.Parse()
 
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
@@ -55,7 +60,7 @@ func HandleConnection(conn net.Conn) {
 
 	if http_method == "GET" {
 		if url == "/" {
-			conn.Write([]byte(fmt.Sprintf("%s\r\n\r\n", http_200)))
+			conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_200))
 
 		} else if strings.HasPrefix(url, "/echo/") {
 			response_content := strings.ReplaceAll(url, "/echo/", "")
@@ -70,19 +75,18 @@ func HandleConnection(conn net.Conn) {
 			conn.Write([]byte(response))
 		} else if strings.HasPrefix(url, "/files/") {
 			filename := strings.ReplaceAll(url, "/files/", "")
-			file_path := flag.String("directory", "", "")
-			flag.Parse()
+			file_path := *directory_flag
 
-			content, err := os.ReadFile(fmt.Sprintf("%s/%s", *file_path, filename))
+			content, err := os.ReadFile(fmt.Sprintf("%s/%s", file_path, filename))
 			if err != nil {
-				conn.Write([]byte(fmt.Sprintf("%s\r\n\r\n", http_404)))
+				conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_404))
 				return
 			}
 			response := GenerateResponse(string(content), content_type_octet, http_200)
 			conn.Write([]byte(response))
 
 		} else {
-			conn.Write([]byte(fmt.Sprintf("%s\r\n\r\n", http_404)))
+			conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_404))
 
 		}
 	}
