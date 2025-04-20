@@ -16,6 +16,7 @@ const content_type_octet = "application/octet-stream"
 const content_length_formatter = "Content-Length: %d\r\n"
 
 const http_200 = "HTTP/1.1 200 OK"
+const http_201 = "HTTP/1.1 201 Created"
 const http_404 = "HTTP/1.1 404 Not Found"
 
 var directory_flag *string
@@ -88,6 +89,19 @@ func HandleConnection(conn net.Conn) {
 		} else {
 			conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_404))
 
+		}
+	} else if http_method == "POST" {
+		if strings.HasPrefix(url, "/files/") {
+			filename := strings.ReplaceAll(url, "/files/", "")
+			file_path := *directory_flag
+
+			err = os.WriteFile(fmt.Sprintf("%s/%s", file_path, filename), []byte(request_body), 0644)
+			if err != nil {
+				fmt.Println("Error writing file: ", err.Error())
+				return
+			}
+
+			conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_201))
 		}
 	}
 }
