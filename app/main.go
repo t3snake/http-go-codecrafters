@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -10,8 +11,12 @@ import (
 
 const content_type_formatter = "Content-Type: %s\r\n"
 const content_type_plaintext = "text/plain"
+const content_type_octet = "octet-stream"
 
 const content_length_formatter = "Content-Length: %d\r\n"
+
+const http_200 = "HTTP/1.1 200 OK"
+const http_404 = "HTTP/1.1 404 Not Found"
 
 func main() {
 	fmt.Println("Logs from your program will appear here!")
@@ -39,6 +44,7 @@ func HandleConnection(conn net.Conn) {
 	request_length, err := conn.Read(request_buffer)
 	if err != nil {
 		fmt.Println("Error reading request: ", err.Error())
+		return
 	}
 
 	request_line, request_body, request_headers := ParseRequest(request_buffer[:request_length])
@@ -49,21 +55,34 @@ func HandleConnection(conn net.Conn) {
 
 	if http_method == "GET" {
 		if url == "/" {
-			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+			conn.Write([]byte(fmt.Sprintf("%s\r\n\r\n", http_200)))
 
 		} else if strings.HasPrefix(url, "/echo/") {
 			response_content := strings.ReplaceAll(url, "/echo/", "")
 
-			response := GenerateResponse(response_content, content_type_plaintext, "HTTP/1.1 200 OK")
+			response := GenerateResponse(response_content, content_type_plaintext, http_200)
 			conn.Write([]byte(response))
 
 		} else if url == "/user-agent" {
 			response_content := request_headers["User-Agent"]
 
-			response := GenerateResponse(response_content, content_type_plaintext, "HTTP/1.1 200 OK")
+			response := GenerateResponse(response_content, content_type_plaintext, http_200)
 			conn.Write([]byte(response))
+		} else if strings.HasPrefix(url, "/files/") {
+			filename := strings.ReplaceAll(url, "/files/", "")
+			file_path := flag.String("directory", "", "")
+			flag.Parse()
+
+			content, err := os.ReadFile(fmt.Sprintf("%s/%s", *file_path, filename))
+			if err != nil {
+				conn.Write([]byte(fmt.Sprintf("%s\r\n\r\n", http_404)))
+				return
+			}
+			response := GenerateResponse(string(content), content_type_octet, http_200)
+			conn.Write([]byte(response))
+
 		} else {
-			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			conn.Write([]byte(fmt.Sprintf("%s\r\n\r\n", http_404)))
 
 		}
 	}
