@@ -11,7 +11,7 @@ import (
 
 const content_type_formatter = "Content-Type: %s\r\n"
 const content_type_plaintext = "text/plain"
-const content_type_octet = "octet-stream"
+const content_type_octet = "application/octet-stream"
 
 const content_length_formatter = "Content-Length: %d\r\n"
 
