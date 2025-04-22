@@ -158,11 +158,16 @@ func GenerateResponse(content, content_type, response_line string, request_heade
 
 // doesServerSupportCompression checks the request header Accept-Encoding and returns true with supported compression, if server supports it
 func doesServerSupportCompression(request_headers map[string]string) (bool, string) {
-	value, exists := request_headers["Accept-Encoding"]
+	values, exists := request_headers["Accept-Encoding"]
+	homogenized_values := strings.ReplaceAll(values, ", ", ",")
+	client_encodings := strings.Split(homogenized_values, ",")
+
 	if exists {
 		for i := 0; i < len(accepted_compression); i++ {
-			if value == accepted_compression[i] {
-				return true, value
+			for j := 0; j < len(client_encodings); j++ {
+				if client_encodings[j] == accepted_compression[i] {
+					return true, client_encodings[j]
+				}
 			}
 		}
 		return false, ""
