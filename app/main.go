@@ -14,6 +14,9 @@ const content_type_plaintext = "text/plain"
 const content_type_octet = "application/octet-stream"
 
 const content_length_formatter = "Content-Length: %d\r\n"
+const content_encoding_formatter = "Content-Encoding: %s\r\n"
+
+var accepted_compression = []string{"gzip"}
 
 const http_200 = "HTTP/1.1 200 OK"
 const http_201 = "HTTP/1.1 201 Created"
@@ -66,13 +69,13 @@ func HandleConnection(conn net.Conn) {
 		} else if strings.HasPrefix(url, "/echo/") {
 			response_content := strings.ReplaceAll(url, "/echo/", "")
 
-			response := GenerateResponse(response_content, content_type_plaintext, http_200)
+			response := GenerateResponse(response_content, content_type_plaintext, http_200, request_headers)
 			conn.Write([]byte(response))
 
 		} else if url == "/user-agent" {
 			response_content := request_headers["User-Agent"]
 
-			response := GenerateResponse(response_content, content_type_plaintext, http_200)
+			response := GenerateResponse(response_content, content_type_plaintext, http_200, request_headers)
 			conn.Write([]byte(response))
 		} else if strings.HasPrefix(url, "/files/") {
 			filename := strings.ReplaceAll(url, "/files/", "")
@@ -83,7 +86,7 @@ func HandleConnection(conn net.Conn) {
 				conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_404))
 				return
 			}
-			response := GenerateResponse(string(content), content_type_octet, http_200)
+			response := GenerateResponse(string(content), content_type_octet, http_200, request_headers)
 			conn.Write([]byte(response))
 
 		} else {
@@ -136,13 +139,34 @@ func ParseRequestLine(request_line string) (string, string, string) {
 	return http_method, target, http_version
 }
 
-// GenerateResponse takes the content, the content type and response to generate and return response
-func GenerateResponse(content, content_type, response_line string) string {
+// GenerateResponse takes the content, the content type, response line and request headers to generate response
+func GenerateResponse(content, content_type, response_line string, request_headers map[string]string) string {
 	content_type_header := fmt.Sprintf(content_type_formatter, content_type)
 	content_length_header := fmt.Sprintf(content_length_formatter, len(content))
 
 	response_headers := fmt.Sprintf("%s%s", content_type_header, content_length_header)
 
+	supported, value := doesServerSupportCompression(request_headers)
+	if supported {
+		content_encoding_header := fmt.Sprintf(content_encoding_formatter, value)
+		response_headers = fmt.Sprintf("%s%s", response_headers, content_encoding_header)
+	}
+
 	response := fmt.Sprintf("%s\r\n%s\r\n%s", response_line, response_headers, content)
 	return response
+}
+
+// doesServerSupportCompression checks the request header Accept-Encoding and returns true with supported compression, if server supports it
+func doesServerSupportCompression(request_headers map[string]string) (bool, string) {
+	value, exists := request_headers["Accept-Encoding"]
+	if exists {
+		for i := 0; i < len(accepted_compression); i++ {
+			if value == accepted_compression[i] {
+				return true, value
+			}
+		}
+		return false, ""
+	} else {
+		return false, ""
+	}
 }
