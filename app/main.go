@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"flag"
 	"fmt"
 	"net"
@@ -69,13 +70,13 @@ func HandleConnection(conn net.Conn) {
 		} else if strings.HasPrefix(url, "/echo/") {
 			response_content := strings.ReplaceAll(url, "/echo/", "")
 
-			response := GenerateResponse(response_content, content_type_plaintext, http_200, request_headers)
+			response := GenerateResponse([]byte(response_content), content_type_plaintext, http_200, request_headers)
 			conn.Write([]byte(response))
 
 		} else if url == "/user-agent" {
 			response_content := request_headers["User-Agent"]
 
-			response := GenerateResponse(response_content, content_type_plaintext, http_200, request_headers)
+			response := GenerateResponse([]byte(response_content), content_type_plaintext, http_200, request_headers)
 			conn.Write([]byte(response))
 		} else if strings.HasPrefix(url, "/files/") {
 			filename := strings.ReplaceAll(url, "/files/", "")
@@ -86,7 +87,7 @@ func HandleConnection(conn net.Conn) {
 				conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_404))
 				return
 			}
-			response := GenerateResponse(string(content), content_type_octet, http_200, request_headers)
+			response := GenerateResponse(content, content_type_octet, http_200, request_headers)
 			conn.Write([]byte(response))
 
 		} else {
@@ -98,7 +99,7 @@ func HandleConnection(conn net.Conn) {
 			filename := strings.ReplaceAll(url, "/files/", "")
 			file_path := *directory_flag
 
-			err = os.WriteFile(fmt.Sprintf("%s/%s", file_path, filename), []byte(request_body), 0644)
+			err = os.WriteFile(fmt.Sprintf("%s/%s", file_path, filename), request_body, 0644)
 			if err != nil {
 				fmt.Println("Error writing file: ", err.Error())
 				return
@@ -109,11 +110,11 @@ func HandleConnection(conn net.Conn) {
 	}
 }
 
-// ParseRequest takes the request string and returns request line as string, request body as string and map of request headers respectively
-func ParseRequest(request []byte) (string, string, map[string]string) {
+// ParseRequest takes the request string and returns request line as string, request body as byte array and map of request headers respectively
+func ParseRequest(request []byte) (string, []byte, map[string]string) {
 	request_parts := bytes.Split(request, []byte("\r\n"))
 	request_line := string(request_parts[0])
-	request_body := string(request_parts[len(request_parts)-1])
+	request_body := request_parts[len(request_parts)-1]
 
 	request_headers := make(map[string]string)
 
@@ -140,7 +141,7 @@ func ParseRequestLine(request_line string) (string, string, string) {
 }
 
 // GenerateResponse takes the content, the content type, response line and request headers to generate response
-func GenerateResponse(content, content_type, response_line string, request_headers map[string]string) string {
+func GenerateResponse(content []byte, content_type, response_line string, request_headers map[string]string) string {
 	content_type_header := fmt.Sprintf(content_type_formatter, content_type)
 	content_length_header := fmt.Sprintf(content_length_formatter, len(content))
 
@@ -150,6 +151,8 @@ func GenerateResponse(content, content_type, response_line string, request_heade
 	if supported {
 		content_encoding_header := fmt.Sprintf(content_encoding_formatter, value)
 		response_headers = fmt.Sprintf("%s%s", response_headers, content_encoding_header)
+		compressed_response := CompressWithGzip(content)
+		return fmt.Sprintf("%s\r\n%s\r\n%s", response_line, response_headers, compressed_response)
 	}
 
 	response := fmt.Sprintf("%s\r\n%s\r\n%s", response_line, response_headers, content)
@@ -163,8 +166,8 @@ func doesServerSupportCompression(request_headers map[string]string) (bool, stri
 	client_encodings := strings.Split(homogenized_values, ",")
 
 	if exists {
-		for i := 0; i < len(accepted_compression); i++ {
-			for j := 0; j < len(client_encodings); j++ {
+		for i := range accepted_compression {
+			for j := range client_encodings {
 				if client_encodings[j] == accepted_compression[i] {
 					return true, client_encodings[j]
 				}
@@ -174,4 +177,18 @@ func doesServerSupportCompression(request_headers map[string]string) (bool, stri
 	} else {
 		return false, ""
 	}
+}
+
+// CompressWithGzip takes int content as byte slice and returns compressed data as byte slice.
+func CompressWithGzip(content []byte) []byte {
+	var buf bytes.Buffer
+	writer := gzip.NewWriter(&buf)
+
+	_, err := writer.Write(content)
+	if err != nil {
+		fmt.Println("Error while compressing with gzip: ", err.Error())
+		return nil
+	}
+
+	return buf.Bytes()
 }
