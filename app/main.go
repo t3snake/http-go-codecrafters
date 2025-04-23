@@ -152,8 +152,9 @@ func GenerateResponse(content []byte, content_type, response_line string, reques
 		content_length_header := fmt.Sprintf(content_length_formatter, len(compressed_response))
 		response_headers := fmt.Sprintf("%s%s%s", content_type_header, content_length_header, content_encoding_header)
 
-		response_without_body := []byte(fmt.Sprintf("%s\r\n%s\r\n", response_line, response_headers))
-		return fmt.Append(response_without_body, compressed_response)
+		response_without_body := fmt.Appendf(nil, "%s\r\n%s\r\n", response_line, response_headers)
+		response := append(response_without_body, compressed_response...)
+		return response
 	}
 	content_length_header := fmt.Sprintf(content_length_formatter, len(content))
 	response_headers := fmt.Sprintf("%s%s", content_type_header, content_length_header)
