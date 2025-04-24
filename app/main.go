@@ -46,10 +46,9 @@ func main() {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
+	// conn.SetReadDeadline(time.Now().Add(timeout_duration))
 
 	for {
-		fmt.Println("Conn started")
-		// conn.SetReadDeadline(time.Now().Add(timeout_duration))
 		go HandleConnection(conn)
 	}
 }
@@ -57,11 +56,13 @@ func main() {
 func HandleConnection(conn net.Conn) {
 	request_buffer := make([]byte, 30000)
 	request_length, err := conn.Read(request_buffer)
+	if request_length == 0 {
+		return
+	}
 	if err != nil {
 		fmt.Println("Error reading request: ", err.Error())
 		return
 	}
-	// conn.SetReadDeadline(time.Now().Add(timeout_duration))
 
 	request_line, request_body, request_headers := ParseRequest(request_buffer[:request_length])
 	if request_headers["connection"] == "close" {
