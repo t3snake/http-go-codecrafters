@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 )
 
 const content_type_formatter = "Content-Type: %s\r\n"
@@ -23,6 +24,8 @@ const http_200 = "HTTP/1.1 200 OK"
 const http_201 = "HTTP/1.1 201 Created"
 const http_404 = "HTTP/1.1 404 Not Found"
 
+const timeout_duration time.Duration = time.Duration(1.5 * float64(time.Second))
+
 var directory_flag *string
 
 func main() {
@@ -31,20 +34,22 @@ func main() {
 	directory_flag = flag.String("directory", "", "")
 	flag.Parse()
 
-	l, err := net.Listen("tcp", "0.0.0.0:4221")
+	listener, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
-	defer l.Close()
+	defer listener.Close()
+
+	conn, err := listener.Accept()
+	if err != nil {
+		fmt.Println("Error accepting connection: ", err.Error())
+		os.Exit(1)
+	}
 
 	for {
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accepting connection: ", err.Error())
-			os.Exit(1)
-		}
-
+		fmt.Println("Conn started")
+		// conn.SetReadDeadline(time.Now().Add(timeout_duration))
 		go HandleConnection(conn)
 	}
 }
@@ -56,8 +61,12 @@ func HandleConnection(conn net.Conn) {
 		fmt.Println("Error reading request: ", err.Error())
 		return
 	}
+	// conn.SetReadDeadline(time.Now().Add(timeout_duration))
 
 	request_line, request_body, request_headers := ParseRequest(request_buffer[:request_length])
+	if request_headers["connection"] == "close" {
+		defer conn.Close()
+	}
 
 	fmt.Printf("Request Body: %s", request_body)
 
