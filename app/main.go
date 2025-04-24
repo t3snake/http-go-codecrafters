@@ -80,7 +80,11 @@ func HandleConnection(conn net.Conn) {
 
 	if http_method == "GET" {
 		if url == "/" {
-			conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_200))
+			connection_header := ""
+			if request_headers["Connection"] == "close" {
+				connection_header = fmt.Sprintf(connection_formatter, "close")
+			}
+			conn.Write(fmt.Appendf(nil, "%s\r\n%s\r\n", http_200, connection_header))
 
 		} else if strings.HasPrefix(url, "/echo/") {
 			response_content := strings.ReplaceAll(url, "/echo/", "")
@@ -99,14 +103,23 @@ func HandleConnection(conn net.Conn) {
 
 			content, err := os.ReadFile(fmt.Sprintf("%s/%s", file_path, filename))
 			if err != nil {
-				conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_404))
+				connection_header := ""
+				if request_headers["Connection"] == "close" {
+					connection_header = fmt.Sprintf(connection_formatter, "close")
+				}
+				conn.Write(fmt.Appendf(nil, "%s\r\n%s\r\n", http_404, connection_header))
+				conn.Close()
 				return
 			}
 			response := GenerateResponse(content, content_type_octet, http_200, request_headers)
 			conn.Write(response)
 
 		} else {
-			conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_404))
+			connection_header := ""
+			if request_headers["Connection"] == "close" {
+				connection_header = fmt.Sprintf(connection_formatter, "close")
+			}
+			conn.Write(fmt.Appendf(nil, "%s\r\n%s\r\n", http_404, connection_header))
 
 		}
 	} else if http_method == "POST" {
@@ -120,7 +133,12 @@ func HandleConnection(conn net.Conn) {
 				return
 			}
 
-			conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_201))
+			connection_header := ""
+			if request_headers["Connection"] == "close" {
+				connection_header = fmt.Sprintf(connection_formatter, "close")
+			}
+
+			conn.Write(fmt.Appendf(nil, "%s\r\n%s\r\n", http_201, connection_header))
 		}
 	}
 
