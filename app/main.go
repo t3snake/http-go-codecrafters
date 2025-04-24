@@ -28,6 +28,7 @@ const http_404 = "HTTP/1.1 404 Not Found"
 const timeout_duration time.Duration = time.Duration(float64(time.Second))
 
 var directory_flag *string
+var is_timeout bool = false
 
 func main() {
 	fmt.Println("Logs from your program will appear here!")
@@ -49,32 +50,47 @@ func main() {
 			os.Exit(1)
 		}
 
-		var is_timeout bool = false
+		is_timeout = false
 
 		go func() {
 			time.Sleep(timeout_duration)
 			is_timeout = true
 		}()
 
+		stop := make(chan bool)
+
+	Loop:
 		for !is_timeout {
-			go HandleConnection(conn)
+			go HandleConnection(conn, stop)
+			select {
+			case <-stop:
+				break Loop
+			default:
+				continue
+			}
 		}
 
 	}
 }
 
-func HandleConnection(conn net.Conn) {
+func HandleConnection(conn net.Conn, close chan bool) {
 	request_buffer := make([]byte, 30000)
 	request_length, err := conn.Read(request_buffer)
-	if request_length == 0 {
-		return
-	}
 	if err != nil {
+		// close <- false
+		if request_length == 0 {
+			return
+		}
 		fmt.Println("Error reading request: ", err.Error())
 		return
 	}
 
 	request_line, request_body, request_headers := ParseRequest(request_buffer[:request_length])
+
+	if request_headers["Connection"] == "close" {
+		close <- true
+		defer conn.Close()
+	}
 
 	http_method, url, _ := ParseRequestLine(request_line)
 
@@ -108,7 +124,9 @@ func HandleConnection(conn net.Conn) {
 					connection_header = fmt.Sprintf(connection_formatter, "close")
 				}
 				conn.Write(fmt.Appendf(nil, "%s\r\n%s\r\n", http_404, connection_header))
-				conn.Close()
+				if request_headers["Connection"] == "close" {
+					conn.Close()
+				}
 				return
 			}
 			response := GenerateResponse(content, content_type_octet, http_200, request_headers)
@@ -140,10 +158,6 @@ func HandleConnection(conn net.Conn) {
 
 			conn.Write(fmt.Appendf(nil, "%s\r\n%s\r\n", http_201, connection_header))
 		}
-	}
-
-	if request_headers["connection"] == "close" {
-		conn.Close()
 	}
 }
 
