@@ -125,7 +125,7 @@ func HandleConnection(conn net.Conn) {
 	}
 
 	if request_headers["connection"] == "close" {
-		defer conn.Close()
+		conn.Close()
 	}
 }
 
