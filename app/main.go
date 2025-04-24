@@ -17,6 +17,7 @@ const content_type_octet = "application/octet-stream"
 
 const content_length_formatter = "Content-Length: %d\r\n"
 const content_encoding_formatter = "Content-Encoding: %s\r\n"
+const connection_formatter = "Connection: %s\r\n"
 
 var accepted_compression = []string{"gzip"}
 
@@ -74,9 +75,6 @@ func HandleConnection(conn net.Conn) {
 	}
 
 	request_line, request_body, request_headers := ParseRequest(request_buffer[:request_length])
-	if request_headers["connection"] == "close" {
-		defer conn.Close()
-	}
 
 	http_method, url, _ := ParseRequestLine(request_line)
 
@@ -125,6 +123,10 @@ func HandleConnection(conn net.Conn) {
 			conn.Write(fmt.Appendf(nil, "%s\r\n\r\n", http_201))
 		}
 	}
+
+	if request_headers["connection"] == "close" {
+		defer conn.Close()
+	}
 }
 
 // ParseRequest takes the request string and returns request line as string, request body as byte array and map of request headers respectively
@@ -169,12 +171,22 @@ func GenerateResponse(content []byte, content_type, response_line string, reques
 		content_length_header := fmt.Sprintf(content_length_formatter, len(compressed_response))
 		response_headers := fmt.Sprintf("%s%s%s", content_type_header, content_length_header, content_encoding_header)
 
+		if request_headers["Connection"] == "close" {
+			connection_header := fmt.Sprintf(connection_formatter, "close")
+			response_headers = fmt.Sprintf("%s%s", response_headers, connection_header)
+		}
+
 		response_without_body := fmt.Appendf(nil, "%s\r\n%s\r\n", response_line, response_headers)
 		response := append(response_without_body, compressed_response...)
 		return response
 	}
 	content_length_header := fmt.Sprintf(content_length_formatter, len(content))
 	response_headers := fmt.Sprintf("%s%s", content_type_header, content_length_header)
+
+	if request_headers["Connection"] == "close" {
+		connection_header := fmt.Sprintf(connection_formatter, "close")
+		response_headers = fmt.Sprintf("%s%s", response_headers, connection_header)
+	}
 
 	return fmt.Appendf(nil, "%s\r\n%s\r\n%s", response_line, response_headers, content)
 }
