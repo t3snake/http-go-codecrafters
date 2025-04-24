@@ -24,7 +24,7 @@ const http_200 = "HTTP/1.1 200 OK"
 const http_201 = "HTTP/1.1 201 Created"
 const http_404 = "HTTP/1.1 404 Not Found"
 
-const timeout_duration time.Duration = time.Duration(10 * float64(time.Second))
+const timeout_duration time.Duration = time.Duration(float64(time.Second))
 
 var directory_flag *string
 
