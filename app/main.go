@@ -24,7 +24,7 @@ const http_200 = "HTTP/1.1 200 OK"
 const http_201 = "HTTP/1.1 201 Created"
 const http_404 = "HTTP/1.1 404 Not Found"
 
-const timeout_duration time.Duration = time.Duration(1.5 * float64(time.Second))
+const timeout_duration time.Duration = time.Duration(10 * float64(time.Second))
 
 var directory_flag *string
 
@@ -41,15 +41,24 @@ func main() {
 	}
 	defer listener.Close()
 
-	conn, err := listener.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
-	}
-	// conn.SetReadDeadline(time.Now().Add(timeout_duration))
-
 	for {
-		go HandleConnection(conn)
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+
+		var is_timeout bool = false
+
+		go func() {
+			time.Sleep(timeout_duration)
+			is_timeout = true
+		}()
+
+		for !is_timeout {
+			go HandleConnection(conn)
+		}
+
 	}
 }
 
@@ -68,8 +77,6 @@ func HandleConnection(conn net.Conn) {
 	if request_headers["connection"] == "close" {
 		defer conn.Close()
 	}
-
-	fmt.Printf("Request Body: %s", request_body)
 
 	http_method, url, _ := ParseRequestLine(request_line)
 
